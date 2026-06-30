@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite database (data lives on the server, not in git)
+/data/
+
+# Drizzle generated migrations (commit these when ready to deploy schema changes)
+# /drizzle/

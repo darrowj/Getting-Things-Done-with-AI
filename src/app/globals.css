@@ -1,26 +1,151 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Design tokens: Light ─────────────────────────────────── */
+:root,
+[data-theme="light"] {
+  --app-bg:       #eef0f3;
+  --surface:      #ffffff;
+  --header-bg:    #ffffff;
+  --text:         #1f2530;
+  --sub:          #79808a;
+  --line:         #e2e5ea;
+  --line-soft:    #eef0f3;
+  --accent:       #2f3138;
+  --accent-text:  #ffffff;
+  --today-bg:     rgba(47,49,56,0.05);
+  --input-bg:     #f7f8fa;
+
+  /* category - light */
+  --cat-work-bg:      #e8effb;
+  --cat-work-fg:      #1b3a6b;
+  --cat-work-bar:     #2f6fdb;
+  --cat-personal-bg:  #fdefdd;
+  --cat-personal-fg:  #7a4a16;
+  --cat-personal-bar: #d98a3d;
+  --cat-health-bg:    #e6f4ec;
+  --cat-health-fg:    #1e5236;
+  --cat-health-bar:   #2f9e63;
+  --cat-focus-bg:     #ecebf2;
+  --cat-focus-fg:     #34324a;
+  --cat-focus-bar:    #5d5a86;
+  --cat-other-bg:     #eef0f2;
+  --cat-other-fg:     #43484f;
+  --cat-other-bar:    #8a909a;
+
+  /* planning card chip bg */
+  --chip-summary-bg: rgba(47,111,219,0.16);
+  --chip-routine-bg: rgba(47,158,99,0.16);
+  --chip-goals-bg:   rgba(217,138,61,0.16);
+  --wm-opacity: 0.05;
+  --card-grad-alpha: 0.09;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Design tokens: Graphite ──────────────────────────────── */
+[data-theme="graphite"] {
+  --app-bg:       #1c1e22;
+  --surface:      #26282e;
+  --header-bg:    #222429;
+  --text:         #e8eaef;
+  --sub:          #9097a1;
+  --line:         #34373d;
+  --line-soft:    #2d3036;
+  --accent:       #cdd0d7;
+  --accent-text:  #1c1e22;
+  --today-bg:     rgba(255,255,255,0.06);
+  --input-bg:     #1f2126;
+
+  /* category - graphite */
+  --cat-work-bg:      rgba(91,141,239,0.20);
+  --cat-work-fg:      #cfe0fb;
+  --cat-work-bar:     #5b8def;
+  --cat-personal-bg:  rgba(224,160,90,0.20);
+  --cat-personal-fg:  #f3d8b6;
+  --cat-personal-bar: #e0a05a;
+  --cat-health-bg:    rgba(76,191,134,0.20);
+  --cat-health-fg:    #bfe6cf;
+  --cat-health-bar:   #4cbf86;
+  --cat-focus-bg:     rgba(185,185,198,0.18);
+  --cat-focus-fg:     #e2e2ea;
+  --cat-focus-bar:    #b9b9c6;
+  --cat-other-bg:     rgba(154,160,172,0.16);
+  --cat-other-fg:     #d4d8df;
+  --cat-other-bar:    #9aa0ac;
+
+  --chip-summary-bg: rgba(47,111,219,0.26);
+  --chip-routine-bg: rgba(47,158,99,0.26);
+  --chip-goals-bg:   rgba(217,138,61,0.26);
+  --wm-opacity: 0.07;
+  --card-grad-alpha: 0.13;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Keyframes ────────────────────────────────────────────── */
+@keyframes omFade {
+  from { opacity: 0 }
+  to   { opacity: 1 }
 }
+@keyframes omPop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97) }
+  to   { opacity: 1; transform: none }
+}
+@keyframes cbPop {
+  0%   { transform: scale(1) }
+  50%  { transform: scale(1.12) }
+  100% { transform: scale(1) }
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--app-bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* App background: dot grid + top wash, fixed */
+.app-bg {
+  background-color: var(--app-bg);
+  background-image:
+    linear-gradient(180deg, rgba(47,111,219,0.05), transparent 280px),
+    radial-gradient(rgba(47,49,56,0.05) 1px, transparent 1px);
+  background-size: 100% 280px, 22px 22px;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+[data-theme="graphite"] .app-bg {
+  background-image:
+    linear-gradient(180deg, rgba(120,140,200,0.05), transparent 280px),
+    radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 100% 280px, 22px 22px;
+}
+
+/* ── Scrollbar (subtle) ──────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px }
+::-webkit-scrollbar-track { background: transparent }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px }
+
+/* ── Modal animations ────────────────────────────────────── */
+.modal-overlay { animation: omFade 0.16s ease both }
+.modal-dialog  { animation: omPop  0.20s cubic-bezier(.2,.8,.2,1) both }
+
+/* ── Checkbox pop ────────────────────────────────────────── */
+.cb-checked { animation: cbPop 0.15s ease }
+
+/* ── All-day switch ─────────────────────────────────────── */
+.switch-track {
+  width: 40px; height: 22px;
+  border-radius: 11px;
+  transition: background-color 0.18s ease;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.switch-knob {
+  position: absolute; top: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  transition: left 0.18s ease;
 }
