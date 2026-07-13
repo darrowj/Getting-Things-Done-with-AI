@@ -15,6 +15,7 @@ function toRow(ev: CalEvent) {
     category: ev.category,
     repeatFreq: ev.repeat.freq,
     repeatDays: JSON.stringify(ev.repeat.days),
+    exceptions: JSON.stringify(ev.exceptions ?? []),
     remindLead: ev.remind.lead,
     remindPush: ev.remind.push,
     remindEmail: ev.remind.email,
@@ -37,6 +38,7 @@ function fromRow(row: typeof events.$inferSelect): CalEvent {
       freq: row.repeatFreq as CalEvent['repeat']['freq'],
       days: row.repeatDays ? JSON.parse(row.repeatDays) : [],
     },
+    exceptions: row.exceptions ? JSON.parse(row.exceptions) : [],
     remind: {
       lead: row.remindLead as CalEvent['remind']['lead'],
       push: row.remindPush,

@@ -14,6 +14,7 @@ export interface CalEvent {
   category: Category
   repeat: { freq: RepeatFreq; days: number[] }
   remind: { lead: RemindLead; push: boolean; email: boolean; emailAddr: string }
+  exceptions: string[]
 }
 
 export interface RoutineItem {

@@ -107,22 +107,47 @@ npm run dev
 ## Deploying to Linux Server
 
 ```bash
-# From Mac — sync project (excludes node_modules and .next)
-rsync -av --exclude node_modules --exclude .next \
+# From Mac — sync project (excludes node_modules, .next, and the live DB)
+rsync -av --exclude node_modules --exclude .next --exclude data \
   "AI Assisted GTD/gtd-app/" \
   darrowj@192.168.1.246:~/gtd-app/
 
 # On Linux server
 cd ~/gtd-app
 npm install
-npx drizzle-kit migrate     # creates data/gtd.db
+
+# Back up the live database before any migration
+cp data/gtd.db data/gtd.db.bak
+
+# Apply pending migrations (additive only — see below)
+npx drizzle-kit migrate
+
 npm run build
-pm2 start npm --name "gtd" -- start
+pm2 restart gtd             # or: pm2 start npm --name "gtd" -- start  (first time)
 pm2 startup                 # follow printed command to enable on reboot
 pm2 save
 ```
 
 Access from any device on the network: `http://192.168.1.246:3000`
+
+### Database migrations (safe deploy)
+
+Your live data lives in `data/gtd.db` on the Linux server. That file is gitignored and is **not** overwritten by rsync (the `data/` directory is excluded above).
+
+When a code update adds new columns or tables, Drizzle runs only **pending** migrations — it does not recreate the database or re-run migrations already applied. Typical schema changes use `ALTER TABLE ... ADD COLUMN`, which leaves all existing rows intact. New columns start as `NULL` and the app treats missing values as defaults (e.g. an empty exceptions list).
+
+**Deploy order on the server:**
+
+1. rsync new code (excluding `data/`)
+2. `npm install`
+3. `cp data/gtd.db data/gtd.db.bak` — backup before every migration
+4. `npx drizzle-kit migrate` — apply pending migrations only
+5. `npm run build`
+6. `pm2 restart gtd`
+
+**Do not run** `drizzle-kit push` or any command that drops/resets tables on a server with live data. Use `drizzle-kit generate` during development and `drizzle-kit migrate` on the server.
+
+**First-time deploy** (no database yet): skip the backup step; `npx drizzle-kit migrate` creates `data/gtd.db` from scratch.
 
 ---
 

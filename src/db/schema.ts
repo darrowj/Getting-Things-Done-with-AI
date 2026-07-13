@@ -10,6 +10,7 @@ export const events = sqliteTable('events', {
   category: text('category').notNull().default('other'),
   repeatFreq: text('repeat_freq').notNull().default('none'),  // none | daily | weekly
   repeatDays: text('repeat_days'),        // JSON array of weekday numbers e.g. [1,3,5]
+  exceptions: text('exceptions'),         // JSON array of YYYY-MM-DD the series skips
   remindLead: text('remind_lead').notNull().default('none'),  // none | 0 | 5 | 15 | 30 | 60 | 1440
   remindPush: integer('remind_push', { mode: 'boolean' }).notNull().default(false),
   remindEmail: integer('remind_email', { mode: 'boolean' }).notNull().default(false),

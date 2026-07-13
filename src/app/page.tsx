@@ -19,6 +19,7 @@ function emptyEvent(date: string, hour?: number, allDay = false): Partial<CalEve
     start: hour ?? 9, end: (hour ?? 9) + 1,
     category: 'other',
     repeat: { freq: 'none', days: [] },
+    exceptions: [],
     remind: { lead: 'none', push: false, email: false, emailAddr: '' },
   }
 }
@@ -133,7 +134,8 @@ export default function Home() {
 
   const openEdit = useCallback((ev: CalEvent, clickedDate: string) => {
     setSourceDate(clickedDate)
-    setEditing({ ...ev })
+    const occurrenceDate = ev.repeat.freq === 'none' ? ev.date : clickedDate
+    setEditing({ ...ev, date: occurrenceDate })
   }, [])
 
   // ── Save / Delete ────────────────────────────────────────────
@@ -150,6 +152,8 @@ export default function Home() {
     const isNew = !events[ev.id]
     setEvents(prev => ({ ...prev, [ev.id]: ev }))
     setEditing(null)
+    setAnchor(ev.date)
+    setDay(ev.date)
     await persistEvent(ev, isNew)
   }
 
@@ -157,10 +161,28 @@ export default function Home() {
     if (!editing?.title?.trim()) return
     const ev = { ...editing } as CalEvent
     if (!ev.allDay && ev.end <= ev.start) ev.end = ev.start + 0.5
-    const standalone: CalEvent = { ...ev, id: uid(), repeat: { freq: 'none', days: [] } }
-    setEvents(prev => ({ ...prev, [standalone.id]: standalone }))
+
+    const series = events[ev.id]              // original, unedited series
+    const skipDate = sourceDate               // the occurrence that was opened
+
+    const standalone: CalEvent = { ...ev, id: uid(), repeat: { freq: 'none', days: [] }, exceptions: [] }
+
+    let updatedSeries: CalEvent | null = null
+    if (series && series.repeat.freq !== 'none' && skipDate && !series.exceptions?.includes(skipDate)) {
+      updatedSeries = { ...series, exceptions: [...(series.exceptions ?? []), skipDate] }
+    }
+
+    setEvents(prev => {
+      const next = { ...prev, [standalone.id]: standalone }
+      if (updatedSeries) next[updatedSeries.id] = updatedSeries
+      return next
+    })
     setEditing(null)
+    setAnchor(standalone.date)
+    setDay(standalone.date)
+
     await persistEvent(standalone, true)
+    if (updatedSeries) await persistEvent(updatedSeries, false)
   }
 
   const handleDelete = async () => {
@@ -259,7 +281,7 @@ export default function Home() {
 
       {editing && (
         <EventModal
-          ev={editing} weekDays={days}
+          ev={editing}
           isEditing={isEditing} isRecurring={isRecurring}
           onChange={setEditing}
           onSaveAll={handleSaveAll}

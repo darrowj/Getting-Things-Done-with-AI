@@ -66,6 +66,7 @@ export function uid(): string {
 
 export function eventOccursOn(ev: CalEvent, dateStr: string): boolean {
   if (ev.repeat.freq === 'none') return ev.date === dateStr
+  if (ev.exceptions?.includes(dateStr)) return false
   if (ev.repeat.freq === 'daily') return true
   if (ev.repeat.freq === 'weekly') {
     const wd = new Date(dateStr + 'T00:00:00').getDay()
@@ -117,6 +118,7 @@ export function makeSeedEvents(): Record<string, CalEvent> {
     id: uid(), title: 'Drive to CT — help Mom', date: tomorrow,
     allDay: true, start: 0, end: 0, category: 'personal',
     repeat: { freq: 'none', days: [] },
+    exceptions: [],
     remind: { lead: 'none', push: false, email: false, emailAddr: '' },
   })
 
@@ -124,6 +126,7 @@ export function makeSeedEvents(): Record<string, CalEvent> {
     id: uid(), title: 'Gym', date: ws,
     allDay: false, start: 12, end: 13, category: 'health',
     repeat: { freq: 'weekly', days: [1, 3, 5] },
+    exceptions: [],
     remind: { lead: 'none', push: false, email: false, emailAddr: '' },
   })
 
@@ -131,6 +134,7 @@ export function makeSeedEvents(): Record<string, CalEvent> {
     id: uid(), title: 'Library', date: ws,
     allDay: false, start: 14, end: 15, category: 'focus',
     repeat: { freq: 'weekly', days: [3] },
+    exceptions: [],
     remind: { lead: 'none', push: false, email: false, emailAddr: '' },
   })
 

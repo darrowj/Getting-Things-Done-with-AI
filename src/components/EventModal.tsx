@@ -1,6 +1,6 @@
 'use client'
 import { CalEvent, Category, RepeatFreq, RemindLead, DAY_START, DAY_END, CATEGORY_META } from '@/lib/types'
-import { formatHour, isoWeekday } from '@/lib/utils'
+import { formatHour } from '@/lib/utils'
 
 const HALF_HOURS = Array.from({ length: (DAY_END - DAY_START) * 2 + 1 }, (_, i) => DAY_START + i * 0.5)
 const CATEGORIES: Category[] = ['work', 'personal', 'health', 'focus', 'other']
@@ -22,7 +22,6 @@ const WD_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 interface Props {
   ev: Partial<CalEvent>
-  weekDays: string[]
   isEditing: boolean
   isRecurring: boolean
   onChange: (ev: Partial<CalEvent>) => void
@@ -32,7 +31,7 @@ interface Props {
   onClose: () => void
 }
 
-export default function EventModal({ ev, weekDays, isEditing, isRecurring, onChange, onSaveAll, onSaveOccurrence, onDelete, onClose }: Props) {
+export default function EventModal({ ev, isEditing, isRecurring, onChange, onSaveAll, onSaveOccurrence, onDelete, onClose }: Props) {
   const set = (patch: Partial<CalEvent>) => onChange({ ...ev, ...patch })
   const setRepeat = (patch: Partial<CalEvent['repeat']>) => set({ repeat: { ...ev.repeat!, ...patch } })
   const setRemind = (patch: Partial<CalEvent['remind']>) => set({ remind: { ...ev.remind!, ...patch } })
@@ -96,12 +95,12 @@ export default function EventModal({ ev, weekDays, isEditing, isRecurring, onCha
 
         {/* Day + Category */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <select style={selectStyle} value={ev.date ?? ''} onChange={e => set({ date: e.target.value })}>
-            {weekDays.map(d => {
-              const label = new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-              return <option key={d} value={d}>{label}</option>
-            })}
-          </select>
+          <input
+            type="date"
+            style={inputStyle}
+            value={ev.date ?? ''}
+            onChange={e => set({ date: e.target.value })}
+          />
           <select style={selectStyle} value={ev.category ?? 'other'} onChange={e => set({ category: e.target.value as Category })}>
             {CATEGORIES.map(c => (
               <option key={c} value={c}>{CATEGORY_META[c].icon}  {CATEGORY_META[c].label}</option>

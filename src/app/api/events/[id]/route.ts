@@ -18,6 +18,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       category: ev.category,
       repeatFreq: ev.repeat.freq,
       repeatDays: JSON.stringify(ev.repeat.days),
+      exceptions: JSON.stringify(ev.exceptions ?? []),
       remindLead: ev.remind.lead,
       remindPush: ev.remind.push,
       remindEmail: ev.remind.email,
