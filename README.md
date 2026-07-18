@@ -1,26 +1,42 @@
 # AI-Assisted GTD — Weekly Organizer
 
-A personal life-organization tool built with Next.js, SQLite, and the Claude API.  Inspired by Microsoft Outlook's calendar.  Designed to run on a local Linux server and be accessible from any device on the home network.
+A personal life-organization tool built with Next.js, SQLite, and a local Ollama model. Inspired by Microsoft Outlook's calendar. Designed to run on a local Linux server and be accessible from any device on the home network.
 
 Built by Jason Darrow as portfolio project #2 — demonstrating AI-assisted development and full-stack engineering skills.
 
 ---
 
+## Current status (July 2026)
+
+| Area | Status |
+|------|--------|
+| Weekly planner UI (calendar, routine, goals) | **Live** on LAN via PM2 |
+| Daily Brief card in the planner | **Live** |
+| Brief generator (`data/daily_brief.py`) | **Live** — Calendar, Gmail, Notion + `llama3.1:8b` |
+| Weekday cron (7:00 AM Eastern) | **Installed** on Linux |
+| Filter polish (networking / jobs / email noise) | Next — tracked in [`DAILY_BRIEF.md`](DAILY_BRIEF.md) |
+| Google Calendar sync *into* the planner grid | Planned |
+| Reminder delivery (push / email) | Planned |
+
+Operational notes, paths, and a polish backlog live in **[`DAILY_BRIEF.md`](DAILY_BRIEF.md)**.
+
+---
+
 ## What It Does
 
-A single-screen weekly planner with three stacked regions:
+A single-screen weekly planner with stacked regions:
 
-**Calendar** — Week view and Day view with a full time grid (6 AM – 10 PM).  Create, edit, and delete events.  Supports all-day events, recurring events (daily or weekly on selected days), overlapping event layout, and per-category color coding.
+**Calendar** — Week view and Day view with a full time grid (6 AM – 10 PM). Create, edit, and delete events. Supports all-day events, recurring events (daily or weekly on selected days), overlapping event layout, and per-category color coding.
 
-**Event Modal** — Full create/edit experience: title, day, category, all-day toggle, start/end time, repeat pattern with weekday chips, and reminder settings (phone / email).  Recurring events offer "Save this occurrence" vs "Save all" to handle one-off changes without breaking the series.
+**Event Modal** — Full create/edit experience: title, day, category, all-day toggle, start/end time, repeat pattern with weekday chips, and reminder settings (phone / email). Recurring events offer "Save this occurrence" vs "Save all" to handle one-off changes without breaking the series.
 
 **Weekly Planning Panel** — Themed cards below the calendar:
 - **Weekly Summary** — a free-text reflection area, scoped per week
 - **Daily Routine** — checkbox grid for 5 daily habits across all 7 days of the week
 - **SMART Goals** — three goal text areas scoped per week
-- **Daily Brief** — read-only card fed by `data/daily-brief.json` (Calendar, Gmail, Notion + local Ollama). Overwritten each weekday morning; no DB table / history.
+- **Daily Brief** — read-only morning brief from Google Calendar, Gmail, and Notion, with two narrow local-Ollama judgments (most important item + optional prep notes). Written to `data/daily-brief.json` each weekday; no DB table or history.
 
-All data persists to a local SQLite database (except the Daily Brief JSON file).  Theme (Light / Graphite) and navigation position persist across sessions.
+Planner data persists to local SQLite. The Daily Brief is a single overwriteable JSON file. Theme (Light / Graphite) and navigation position persist across sessions.
 
 ---
 
@@ -41,6 +57,8 @@ All data persists to a local SQLite database (except the Daily Brief JSON file).
 | Styling | Tailwind CSS + CSS custom properties |
 | Database | SQLite via `better-sqlite3` |
 | ORM | Drizzle ORM |
+| Daily Brief | Python 3 + Ollama (`llama3.1:8b`) |
+| Integrations | Google Calendar & Gmail (OAuth), Notion REST API |
 | Process manager | PM2 |
 | Hosting | Local Linux server (LAN only) |
 
@@ -113,11 +131,11 @@ npm run dev
 ## Deploying to Linux Server
 
 ```bash
-# From Mac — sync project (excludes node_modules, .next, and the live DB)
+# From Mac — sync project (keeps live DB / generated JSON / .env on the server)
 rsync -av \
   --exclude node_modules --exclude .next \
   --exclude 'data/*.db*' --exclude 'data/*.json' --exclude 'data/*.log' \
-  --exclude 'data/__pycache__' --exclude .env \
+  --exclude 'data/__pycache__' --exclude .env --exclude .venv-brief \
   ./ darrowj@192.168.1.246:~/development/gtd-app/
 
 # On Linux server
@@ -140,13 +158,13 @@ Access from any device on the network: `http://192.168.1.246:3000`
 
 ### Database migrations (safe deploy)
 
-Your live data lives in `data/gtd.db` on the Linux server. That file is gitignored and is **not** overwritten by rsync (the `data/` directory is excluded above).
+Your live data lives in `data/gtd.db` on the Linux server. That file is gitignored and is **not** overwritten by rsync.
 
 When a code update adds new columns or tables, Drizzle runs only **pending** migrations — it does not recreate the database or re-run migrations already applied. Typical schema changes use `ALTER TABLE ... ADD COLUMN`, which leaves all existing rows intact. New columns start as `NULL` and the app treats missing values as defaults (e.g. an empty exceptions list).
 
 **Deploy order on the server:**
 
-1. rsync new code (excluding `data/`)
+1. rsync new code (as above)
 2. `npm install`
 3. `cp data/gtd.db data/gtd.db.bak` — backup before every migration
 4. `npx drizzle-kit migrate` — apply pending migrations only
@@ -167,38 +185,42 @@ UI reads it via `GET /api/brief` (always dynamic / no-store). If the JSON `date`
 ```bash
 # One-time setup on the Linux box
 cd ~/development/gtd-app
-python3 -m venv .venv-brief   # or reuse my-ai-agents venv
+python3 -m venv .venv-brief
 .venv-brief/bin/pip install -r requirements-brief.txt
 cp .env.example .env          # fill NOTION_TOKEN + Google credential paths
-# First Google auth: run once on Mac (has a browser), then copy token.json here
+# First Google auth needs a browser (SSH tunnel or copy token.json from Mac)
 .venv-brief/bin/python data/daily_brief.py
 ```
 
-Crontab (weekdays 7:00 AM — install manually with `crontab -e`; do not auto-install):
+Crontab (weekdays 7:00 AM Eastern — currently installed on the Linux box):
 
 ```cron
 0 7 * * 1-5 cd /home/darrowj/development/gtd-app && /home/darrowj/development/gtd-app/.venv-brief/bin/python data/daily_brief.py >> /home/darrowj/development/gtd-app/data/daily-brief.log 2>&1
 ```
 
+See [`DAILY_BRIEF.md`](DAILY_BRIEF.md) for troubleshooting and planned filter improvements.
+
 ---
 
-## Planned Features (Waves 2 & 3)
+## Roadmap
 
 | Feature | Status |
 |---------|--------|
-| Google Calendar sync into planner grid | Planned — credentials exist |
-| Daily Brief (Notion + Gmail + Calendar + Ollama) | Done — `data/daily_brief.py` + Daily Brief card |
-| Reminder delivery (push + email) | Planned — settings captured, backend TBD |
+| Weekly organizer (calendar, routine, goals) | Done |
+| Daily Brief (Notion + Gmail + Calendar + Ollama) | Done — live with weekday cron |
+| Daily Brief filter polish | Next |
+| Google Calendar sync into planner grid | Planned |
+| Reminder delivery (push + email) | Planned |
 | Editable routine items | Planned |
 
 ---
 
 ## Why I Built This
 
-I manage my week out of a combination of calendar apps, sticky notes, and mental overhead.  None of it stays in one place.  This project is the one place — calendar, habits, and weekly goals on a single screen, running on hardware I own, with no subscription.
+I manage my week out of a combination of calendar apps, sticky notes, and mental overhead. None of it stays in one place. This project is the one place — calendar, habits, weekly goals, and a morning brief on a single screen, running on hardware I own, with no subscription.
 
-The secondary goal: demonstrate that I can build a full-stack AI-assisted web app from scratch.  The design spec was generated with Claude.  The implementation was built collaboratively with Claude Code.  The result is production-quality software running on real infrastructure.
+The secondary goal: demonstrate that I can build a full-stack AI-assisted web app from scratch. The design spec was generated with Claude. The implementation was built collaboratively with AI coding tools. The result is production software running on real infrastructure.
 
 ---
 
-*Built by [Jason Darrow](https://jasondarrow.com) · [GitHub](https://github.com/darrowj)*
+*Built by [Jason Darrow](https://jasondarrow.com) · [GitHub](https://github.com/darrowj/Getting-Things-Done-with-AI)*

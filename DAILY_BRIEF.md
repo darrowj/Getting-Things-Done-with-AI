@@ -18,7 +18,7 @@ End-to-end pipeline is live on the Linux box.
 | Notion Network | DB `7fa4230a-ccc1-4213-83e8-42dc2b4aae04` | Working |
 | Notion Job Tracker | DB `f23d0d93-5b8d-440f-af9b-d399722d9f4e` | Working |
 | Ollama | `llama3.1:8b` on Linux | Working |
-| Cron | Weekdays 7:00 AM Eastern | **Not installed yet** — see below |
+| Cron | Weekdays 7:00 AM Eastern | **Installed** |
 
 ### Machine roles
 
