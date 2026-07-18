@@ -54,3 +54,64 @@ export const CATEGORY_META: Record<Category, { icon: string; label: string }> = 
 export const DAY_START = 6
 export const DAY_END = 22
 export const ROW_HEIGHT = 44
+
+/* ── Daily Brief (from data/daily-brief.json) ─────────────── */
+export type EmailUrgency = 'Urgent' | 'Soon' | 'FYI'
+
+export interface BriefScheduleItem {
+  time: string
+  title: string
+  attendees?: string[]
+}
+
+export interface BriefEmail {
+  urgency: EmailUrgency
+  from: string
+  subject: string
+}
+
+export interface BriefTask {
+  name: string
+  due: string
+  priority: string
+  project: string
+  highPriority: boolean
+}
+
+export interface BriefNetworkItem {
+  name: string
+  why: string
+  nextStep: string
+}
+
+export interface BriefJobItem {
+  company: string
+  stage: string
+  nextAction: string
+}
+
+export interface DailyBrief {
+  date: string
+  dayOfWeek: string
+  mostImportant?: string
+  schedule?: BriefScheduleItem[]
+  emails?: BriefEmail[]
+  tasks?: {
+    dueTodayOrOverdue?: BriefTask[]
+    dueLaterThisWeek?: BriefTask[]
+  }
+  networking?: BriefNetworkItem[]
+  jobTracker?: BriefJobItem[]
+  actionItems?: string[]
+  generatedAt: string
+}
+
+export type DailyBriefResponse =
+  | { ok: true; brief: DailyBrief }
+  | {
+      ok: false
+      reason: 'missing' | 'stale' | 'error'
+      today?: string
+      briefDate?: string | null
+      message: string
+    }

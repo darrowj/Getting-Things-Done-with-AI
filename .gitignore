@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -40,8 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# SQLite database (data lives on the server, not in git)
-/data/
+# Runtime data in /data (DB + generated brief) — keep scripts tracked
+/data/*
+!/data/daily_brief.py
+!/data/.gitkeep
 
 # Drizzle generated migrations (commit these when ready to deploy schema changes)
 # /drizzle/

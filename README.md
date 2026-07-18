@@ -14,12 +14,13 @@ A single-screen weekly planner with three stacked regions:
 
 **Event Modal** — Full create/edit experience: title, day, category, all-day toggle, start/end time, repeat pattern with weekday chips, and reminder settings (phone / email).  Recurring events offer "Save this occurrence" vs "Save all" to handle one-off changes without breaking the series.
 
-**Weekly Planning Panel** — Three themed cards below the calendar:
+**Weekly Planning Panel** — Themed cards below the calendar:
 - **Weekly Summary** — a free-text reflection area, scoped per week
 - **Daily Routine** — checkbox grid for 5 daily habits across all 7 days of the week
 - **SMART Goals** — three goal text areas scoped per week
+- **Daily Brief** — read-only card fed by `data/daily-brief.json` (Calendar, Gmail, Notion + local Ollama). Overwritten each weekday morning; no DB table / history.
 
-All data persists to a local SQLite database.  Theme (Light / Graphite) and navigation position persist across sessions.
+All data persists to a local SQLite database (except the Daily Brief JSON file).  Theme (Light / Graphite) and navigation position persist across sessions.
 
 ---
 
@@ -55,7 +56,8 @@ src/
 │   │   │   └── [id]/        # PUT update, DELETE
 │   │   ├── routine/         # GET all, PUT toggle
 │   │   ├── summary/[weekStart]/   # GET, PUT
-│   │   └── goals/[weekStart]/     # GET, PUT
+│   │   ├── goals/[weekStart]/     # GET, PUT
+│   │   └── brief/           # GET daily-brief.json (force-dynamic)
 │   ├── globals.css          # Design tokens (light + graphite), keyframes
 │   ├── layout.tsx
 │   └── page.tsx             # Main app — state, data loading, event handlers
@@ -64,13 +66,17 @@ src/
 │   ├── WeekView.tsx         # 7-column calendar grid
 │   ├── DayView.tsx          # Single-day view
 │   ├── EventModal.tsx       # Create / edit modal
-│   └── PlanningPanel.tsx    # Summary, Routine, Goals cards
+│   ├── PlanningPanel.tsx    # Summary, Routine, Goals cards
+│   └── DailyBriefPanel.tsx  # Read-only daily brief card
 ├── db/
 │   ├── index.ts             # Drizzle client (better-sqlite3)
 │   └── schema.ts            # Table definitions
 └── lib/
     ├── types.ts             # TypeScript types + constants
     └── utils.ts             # Date helpers, recurring event logic, overlap layout
+data/
+├── daily_brief.py           # Cron generator → daily-brief.json
+└── gtd.db                   # SQLite (gitignored)
 ```
 
 ---
@@ -108,12 +114,14 @@ npm run dev
 
 ```bash
 # From Mac — sync project (excludes node_modules, .next, and the live DB)
-rsync -av --exclude node_modules --exclude .next --exclude data \
-  "AI Assisted GTD/gtd-app/" \
-  darrowj@192.168.1.246:~/gtd-app/
+rsync -av \
+  --exclude node_modules --exclude .next \
+  --exclude 'data/*.db*' --exclude 'data/*.json' --exclude 'data/*.log' \
+  --exclude 'data/__pycache__' --exclude .env \
+  ./ darrowj@192.168.1.246:~/development/gtd-app/
 
 # On Linux server
-cd ~/gtd-app
+cd ~/development/gtd-app
 npm install
 
 # Back up the live database before any migration
@@ -151,13 +159,35 @@ When a code update adds new columns or tables, Drizzle runs only **pending** mig
 
 ---
 
+## Daily Brief (cron on Linux)
+
+Generator: `data/daily_brief.py` → writes `data/daily-brief.json` (atomic replace).  
+UI reads it via `GET /api/brief` (always dynamic / no-store). If the JSON `date` is not today (America/New_York), the card shows “no brief for today”.
+
+```bash
+# One-time setup on the Linux box
+cd ~/development/gtd-app
+python3 -m venv .venv-brief   # or reuse my-ai-agents venv
+.venv-brief/bin/pip install -r requirements-brief.txt
+cp .env.example .env          # fill NOTION_TOKEN + Google credential paths
+# First Google auth: run once on Mac (has a browser), then copy token.json here
+.venv-brief/bin/python data/daily_brief.py
+```
+
+Crontab (weekdays 7:00 AM — install manually with `crontab -e`; do not auto-install):
+
+```cron
+0 7 * * 1-5 cd /home/darrowj/development/gtd-app && /home/darrowj/development/gtd-app/.venv-brief/bin/python data/daily_brief.py >> /home/darrowj/development/gtd-app/data/daily-brief.log 2>&1
+```
+
+---
+
 ## Planned Features (Waves 2 & 3)
 
 | Feature | Status |
 |---------|--------|
-| Google Calendar sync | Planned — credentials exist |
-| Notion task pull | Planned |
-| Claude API morning briefing | Planned — `morning_briefing.py` exists |
+| Google Calendar sync into planner grid | Planned — credentials exist |
+| Daily Brief (Notion + Gmail + Calendar + Ollama) | Done — `data/daily_brief.py` + Daily Brief card |
 | Reminder delivery (push + email) | Planned — settings captured, backend TBD |
 | Editable routine items | Planned |
 

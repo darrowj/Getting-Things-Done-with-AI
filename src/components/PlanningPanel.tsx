@@ -1,6 +1,7 @@
 'use client'
 import React from 'react'
 import { Category, CATEGORY_META, DEFAULT_ROUTINE_ITEMS } from '@/lib/types'
+import DailyBriefPanel from '@/components/DailyBriefPanel'
 
 const WD_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -222,6 +223,9 @@ export default function PlanningPanel({
           </div>
         </PlanCard>
       </div>
+
+      {/* Daily Brief — full width, below routine + goals */}
+      <DailyBriefPanel />
     </div>
   )
 }
