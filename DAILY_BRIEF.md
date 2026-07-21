@@ -1,6 +1,6 @@
 # Daily Brief — Status & Next Steps
 
-Last updated: 2026-07-18
+Last updated: 2026-07-21
 
 ## Status: Working (manual run)
 
@@ -76,13 +76,13 @@ cd /home/darrowj/development/gtd-app
 
 Priority ideas from first real run (2026-07-18):
 
-1. **Networking** — too broad today (all `Reached Out` / `Responded`). Prefer follow-up date due/overdue only, or a tighter status set.
+1. **Networking** — **Done.** Uses **Intent** (Status removed). Skips Intent = Dead End. Only includes contacts with Follow-up Date within today ± 7 days. Emits/shows `followUpDate` in the brief card.
 2. **Job Tracker** — many `Applied` / `Interested` rows. Prefer follow-up due, Phone Screen, Interview, Offer; stale Applied only.
-3. **Emails** — almost all FYI marketing. Filter senders/subjects, or cap list / drop pure promo.
+3. **Emails** — **Done (hybrid filter + Primary only).** Fetches `is:unread in:inbox category:primary` (Gmail Primary tab — skips Promotions/Social/Updates). Then hard-drops obvious promo and asks Ollama (`llama3.1:8b`) KEEP vs DROP. KEEP = actionable, job-search, or personal (friends/family). Caps at 25, Urgent → Soon → FYI. Tune via `PROMO_*` regexes and the classify prompt in `data/daily_brief.py`. Consumer domains (`@gmail.com`, etc.) are not hard-dropped.
 4. **mostImportant** — LLM picked a medium task over the `🚨HIGH` BTG item. Improve prompt or prefer high-priority overdue in Python before calling Ollama.
 5. **Action items** — currently dumps many overdue tasks. Cap length; lead with HIGH + calendar + active job screens.
 6. **Tasks “later this week”** — empty with current Notion due filter; widen when ready.
-7. **Deploy habit** — when changing UI: rsync from Mac → `npm run build` → `pm2 restart gtd` (load nvm if needed).
+7. **Deploy habit** — when changing UI: rsync from Mac → `npm run build` → `pm2 restart gtd` (load nvm if needed). For script-only changes: rsync `data/daily_brief.py` (and deps if needed); next cron run picks it up — no rebuild required.
 8. **Retire Wave-1** — after cron is trusted, disable the 6:30 my-ai-agents briefing job to avoid duplicate work.
 
 ---

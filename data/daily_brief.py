@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 Daily Brief generator — pulls Calendar, Gmail, and Notion; asks a local
-Ollama model for two narrow judgments; writes data/daily-brief.json.
+Ollama model for narrow judgments (mostImportant, prep notes, email KEEP/DROP);
+writes data/daily-brief.json.
+
+Unread email filtering (hybrid): hard-drop obvious promo, then Ollama KEEP
+for actionable / job-search / personal (friends-family); DROP marketing.
 
 Cron example (weekdays 7:00 AM Eastern — set on the Linux box, do not install
 from this script):
@@ -71,6 +75,23 @@ SCOPES = [
 
 HIGH_PRIORITY_VALUE = "🚨HIGH"
 APPLIED_STALE_DAYS = 14
+
+# Email hybrid filter: fetch more, hard-drop promo, Ollama KEEP/DROP, then cap
+EMAIL_FETCH_MAX = 25
+EMAIL_KEEP_MAX = 25
+
+PROMO_SENDER_RE = re.compile(
+    r"(noreply@|no-reply@|do[\s\-]?not[\s\-]?reply@|donotreply@|"
+    r"newsletter@|marketing@|promo@|mailer-daemon@|notifications?@)",
+    re.I,
+)
+PROMO_CONTENT_RE = re.compile(
+    r"(unsubscribe|%\s*off|save\s*\$|limited\s+time|flash\s+sale|"
+    r"free\s+shipping|newsletter|your\s+weekly\s+digest|view\s+in\s+(your\s+)?browser|"
+    r"list-unsubscribe|email\s+preferences)",
+    re.I,
+)
+URGENCY_RANK = {"Urgent": 0, "Soon": 1, "FYI": 2}
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -289,7 +310,63 @@ def get_todays_events() -> list[dict[str, Any]]:
     return events
 
 
-def get_unread_emails(max_results: int = 15) -> list[dict[str, Any]]:
+def is_obvious_promo(from_raw: str, from_addr: str, subject: str, snippet: str) -> bool:
+    """Hard-drop unambiguous marketing/automated mail. Do not drop consumer domains."""
+    sender_blob = f"{from_raw} {from_addr}"
+    if PROMO_SENDER_RE.search(sender_blob):
+        return True
+    content = f"{subject} {snippet}"
+    if PROMO_CONTENT_RE.search(content):
+        return True
+    return False
+
+
+def classify_email_keep(
+    from_display: str,
+    from_addr: str,
+    subject: str,
+    snippet: str,
+    urgency: str,
+) -> bool:
+    """
+    Ask Ollama KEEP or DROP. KEEP = actionable, job-search, or personal (friends/family).
+    On failure: KEEP Urgent/Soon, DROP FYI.
+    """
+    prompt = (
+        "You filter Jason's unread email for a morning brief.\n"
+        "Reply with exactly one word: KEEP or DROP.\n\n"
+        "KEEP if ANY of:\n"
+        "- Needs a reply, action, or scheduling\n"
+        "- Job-search related (recruiter, interview, application, role outreach)\n"
+        "- Personal mail from a friend, family member, or individual person "
+        "(not a company brand) — even with no 'action required' language\n"
+        "When unsure between a real person and cold sales, prefer KEEP for clearly "
+        "individual senders (personal names, gmail/icloud/etc.).\n\n"
+        "DROP if: promotions, newsletters, product marketing, cold sales, "
+        "or automated company digests.\n\n"
+        f"From: {from_display} <{from_addr}>\n"
+        f"Subject: {subject}\n"
+        f"Snippet: {snippet[:400]}\n"
+    )
+    try:
+        text = ollama_generate(prompt)
+        first = (text.split() or [""])[0].upper().strip(".,:;\"'`")
+        if first == "KEEP":
+            return True
+        if first == "DROP":
+            return False
+        # Model returned something else — fall through to urgency default
+        print(f"  Ollama unclear reply ({text[:60]!r}) → urgency default")
+    except Exception as e:
+        print(f"  Ollama email classify failed: {e}")
+
+    return urgency in ("Urgent", "Soon")
+
+
+def get_unread_emails(
+    max_results: int = EMAIL_FETCH_MAX,
+    keep_max: int = EMAIL_KEEP_MAX,
+) -> list[dict[str, Any]]:
     from email.utils import parseaddr
     from googleapiclient.discovery import build
 
@@ -299,7 +376,7 @@ def get_unread_emails(max_results: int = 15) -> list[dict[str, Any]]:
     listed = (
         service.users()
         .messages()
-        .list(userId="me", q="is:unread in:inbox", maxResults=max_results)
+        .list(userId="me", q="is:unread in:inbox category:primary", maxResults=max_results)
         .execute()
     )
     messages = listed.get("messages", []) or []
@@ -322,6 +399,10 @@ def get_unread_emails(max_results: int = 15) -> list[dict[str, Any]]:
         subject = headers.get("subject", "(no subject)")
         snippet = (full.get("snippet") or "").strip()
 
+        if is_obvious_promo(raw_from, addr, subject, snippet):
+            print(f"Dropped promo: {display} — {subject[:60]}")
+            continue
+
         blob = f"{subject} {snippet}"
         if urgent_re.search(blob):
             urgency = "Urgent"
@@ -330,9 +411,19 @@ def get_unread_emails(max_results: int = 15) -> list[dict[str, Any]]:
         else:
             urgency = "FYI"
 
+        print(f"Classifying email: {display} — {subject[:50]}…")
+        if not classify_email_keep(display, addr, subject, snippet, urgency):
+            print(f"  → DROP")
+            continue
+        print(f"  → KEEP ({urgency})")
+
         emails.append({"urgency": urgency, "from": display, "subject": subject})
 
-    print(f"Gmail: {len(emails)} unread")
+    emails.sort(key=lambda e: URGENCY_RANK.get(e["urgency"], 9))
+    if len(emails) > keep_max:
+        emails = emails[:keep_max]
+
+    print(f"Gmail: {len(emails)} kept after filter (from {len(messages)} unread fetched)")
     return emails
 
 
@@ -411,20 +502,21 @@ def get_tasks() -> dict[str, list[dict[str, Any]]]:
 
 
 def get_networking() -> list[dict[str, Any]]:
-    """Filter in Python so Status can be either Notion 'status' or 'select'."""
+    """Intent (not Status) + Follow-up Date within today ± 7 days."""
     today = today_local()
+    window_start = today - timedelta(days=7)
+    window_end = today + timedelta(days=7)
     pages = notion_query(NOTION_NETWORK_DB, {})
 
     contacts: list[dict[str, Any]] = []
     for page in pages:
         props = page["properties"]
-        status = prop_status(props, "Status") or prop_select(props, "Status")
-        if status == "Dead End":
+        intent = prop_status(props, "Intent") or prop_select(props, "Intent")
+        if intent == "Dead End":
             continue
+
         follow = prop_date_start(props, "Follow-up Date")
-        owed = status in {"Reached Out", "Responded"}
-        due = follow is not None and follow <= today
-        if not owed and not due:
+        if follow is None or follow < window_start or follow > window_end:
             continue
 
         name = prop_title(props, ["Name", "Title"])
@@ -434,18 +526,18 @@ def get_networking() -> list[dict[str, Any]]:
         how = prop_select(props, "How Contacted")
         notes = prop_rich_text(props, "Notes") or prop_rich_text(props, "What Was Asked")
 
-        why_bits = [b for b in [status, relationship, how] if b]
-        if due and follow:
-            why_bits.append(f"follow-up due {follow.isoformat()}")
+        why_bits = [b for b in [intent, relationship, how] if b]
         why = " · ".join(why_bits) if why_bits else "Needs follow-up"
 
         contacts.append({
             "name": name,
             "why": why,
             "nextStep": notes if notes else "Send a short follow-up",
+            "followUpDate": follow.isoformat(),
         })
 
-    print(f"Network: {len(contacts)} contacts needing attention")
+    contacts.sort(key=lambda c: c["followUpDate"])
+    print(f"Network: {len(contacts)} contacts with follow-up in ±7 days")
     return contacts
 
 

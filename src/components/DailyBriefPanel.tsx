@@ -224,7 +224,12 @@ function BriefBody({ brief }: { brief: DailyBrief }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {brief.networking.map((n: BriefNetworkItem, i) => (
               <Row key={`${n.name}-${i}`}>
-                <div style={{ fontWeight: 600 }}>{n.name}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600 }}>{n.name}</span>
+                  {n.followUpDate && (
+                    <span style={{ fontSize: 12, color: 'var(--sub)' }}>Follow-up: {n.followUpDate}</span>
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: 'var(--sub)', marginTop: 2 }}>{n.why}</div>
                 <div style={{ fontSize: 12, marginTop: 4 }}>Next: {n.nextStep}</div>
               </Row>

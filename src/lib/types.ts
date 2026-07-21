@@ -82,6 +82,7 @@ export interface BriefNetworkItem {
   name: string
   why: string
   nextStep: string
+  followUpDate: string
 }
 
 export interface BriefJobItem {

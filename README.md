@@ -14,7 +14,9 @@ Built by Jason Darrow as portfolio project #2 — demonstrating AI-assisted deve
 | Daily Brief card in the planner | **Live** |
 | Brief generator (`data/daily_brief.py`) | **Live** — Calendar, Gmail, Notion + `llama3.1:8b` |
 | Weekday cron (7:00 AM Eastern) | **Installed** on Linux |
-| Filter polish (networking / jobs / email noise) | Next — tracked in [`DAILY_BRIEF.md`](DAILY_BRIEF.md) |
+| Filter polish (jobs) | Next — tracked in [`DAILY_BRIEF.md`](DAILY_BRIEF.md) |
+| Networking filter (Intent + ±7 follow-up) | **Done** — in `data/daily_brief.py` + brief UI |
+| Email noise filter (rules + Ollama) | **Done** — in `data/daily_brief.py` |
 | Google Calendar sync *into* the planner grid | Planned |
 | Reminder delivery (push / email) | Planned |
 
@@ -208,7 +210,9 @@ See [`DAILY_BRIEF.md`](DAILY_BRIEF.md) for troubleshooting and planned filter im
 |---------|--------|
 | Weekly organizer (calendar, routine, goals) | Done |
 | Daily Brief (Notion + Gmail + Calendar + Ollama) | Done — live with weekday cron |
-| Daily Brief filter polish | Next |
+| Daily Brief filter polish (jobs) | Next |
+| Daily Brief networking filter (Intent + ±7) | Done |
+| Daily Brief email filter (promo drop + Ollama KEEP) | Done |
 | Google Calendar sync into planner grid | Planned |
 | Reminder delivery (push + email) | Planned |
 | Editable routine items | Planned |
