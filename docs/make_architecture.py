@@ -17,6 +17,8 @@ Same technique as docs/architecture.svg in ai-job-search:
   - no Mermaid: it does not render in local markdown viewers or plain HTML
 """
 
+from pathlib import Path
+
 W, H = 1040, 940
 
 STAGE = ("#4c3f91", "#6b5cb8")   # pipeline stage        purple
@@ -171,5 +173,9 @@ svg = (
     + "\n".join(p) + "\n</svg>\n"
 )
 
-open("gtd-architecture.svg", "w").write(svg)
-print("wrote gtd-architecture.svg", len(svg), "bytes")
+OUT = Path(__file__).resolve().parent / "architecture.svg"
+OUT.write_text(svg)
+print(f"wrote {OUT} ({len(svg)} bytes)")
+print("PNG:  python3 -c \"import cairosvg; cairosvg.svg2png("
+      "url='docs/architecture.svg', write_to='docs/architecture.png', "
+      "output_width=1625, background_color='white')\"")
