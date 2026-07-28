@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Drizzle generated migrations (commit these when ready to deploy schema changes)
 # /drizzle/
+
+# loose screenshots with real calendar data
+/*.png
