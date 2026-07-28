@@ -38,6 +38,7 @@ load_dotenv()  # also allow cwd / process env (Linux box)
 TZ = ZoneInfo(os.environ.get("TZ", "America/New_York"))
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
 MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+OLLAMA_KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE", "30m")
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_TASKS_DB = os.environ.get("NOTION_TASKS_DB", "305fc6af-d784-498f-a157-67311c0fb2b8")
@@ -80,15 +81,17 @@ APPLIED_STALE_DAYS = 14
 EMAIL_FETCH_MAX = 25
 EMAIL_KEEP_MAX = 25
 
+# Hard-drop is intentionally narrow: only unambiguous marketing senders and
+# strong promo language. noreply@/notifications@ senders and "unsubscribe"
+# footers are NOT dropped — receipts, appointment reminders, and job alerts
+# all look like that. The LLM makes the call on everything else.
 PROMO_SENDER_RE = re.compile(
-    r"(noreply@|no-reply@|do[\s\-]?not[\s\-]?reply@|donotreply@|"
-    r"newsletter@|marketing@|promo@|mailer-daemon@|notifications?@)",
+    r"(newsletter@|marketing@|promo@|promotions@|offers@|deals@)",
     re.I,
 )
 PROMO_CONTENT_RE = re.compile(
-    r"(unsubscribe|%\s*off|save\s*\$|limited\s+time|flash\s+sale|"
-    r"free\s+shipping|newsletter|your\s+weekly\s+digest|view\s+in\s+(your\s+)?browser|"
-    r"list-unsubscribe|email\s+preferences)",
+    r"(%\s*off|save\s*\$|limited\s+time|flash\s+sale|free\s+shipping|"
+    r"clearance|coupon|deal\s+of\s+the\s+day|final\s+hours|don.t\s+miss\s+out)",
     re.I,
 )
 URGENCY_RANK = {"Urgent": 0, "Soon": 1, "FYI": 2}
@@ -321,46 +324,82 @@ def is_obvious_promo(from_raw: str, from_addr: str, subject: str, snippet: str) 
     return False
 
 
-def classify_email_keep(
-    from_display: str,
-    from_addr: str,
-    subject: str,
-    snippet: str,
-    urgency: str,
-) -> bool:
+def classify_emails_batch(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
-    Ask Ollama KEEP or DROP. KEEP = actionable, job-search, or personal (friends/family).
-    On failure: KEEP Urgent/Soon, DROP FYI.
+    ONE Ollama call for all emails. Returns per-email verdicts:
+      {"keep": bool, "urgency": "Urgent"|"Soon"|"FYI", "action": str}
+    keep = actionable, job-search, or personal (friends/family).
+    Fallback per email on any failure: keep if regex urgency is Urgent/Soon.
     """
+    if not candidates:
+        return []
+
+    def fallback(cand: dict[str, Any]) -> dict[str, Any]:
+        # Hard promo drop already ran; if the LLM is unavailable, keep rather than lose mail.
+        return {
+            "keep": True,
+            "urgency": cand["fallbackUrgency"],
+            "action": "",
+        }
+
+    listing = "\n".join(
+        f'{i + 1}. From: {c["from"]} <{c["addr"]}>\n'
+        f'   Subject: {c["subject"]}\n'
+        f'   Snippet: {c["snippet"][:300]}'
+        for i, c in enumerate(candidates)
+    )
     prompt = (
         "You filter Jason's unread email for a morning brief.\n"
-        "Reply with exactly one word: KEEP or DROP.\n\n"
-        "KEEP if ANY of:\n"
-        "- Needs a reply, action, or scheduling\n"
-        "- Job-search related (recruiter, interview, application, role outreach)\n"
-        "- Personal mail from a friend, family member, or individual person "
-        "(not a company brand) — even with no 'action required' language\n"
-        "When unsure between a real person and cold sales, prefer KEEP for clearly "
-        "individual senders (personal names, gmail/icloud/etc.).\n\n"
-        "DROP if: promotions, newsletters, product marketing, cold sales, "
-        "or automated company digests.\n\n"
-        f"From: {from_display} <{from_addr}>\n"
-        f"Subject: {subject}\n"
-        f"Snippet: {snippet[:400]}\n"
+        "For EACH numbered email below, decide three things:\n"
+        "- keep: true if ANY of:\n"
+        "  * needs a reply, action, or scheduling\n"
+        "  * job-search related: recruiters, interviews, applications, role outreach, "
+        "AND job alerts/matches from job boards (LinkedIn, Indeed, Glassdoor, etc.)\n"
+        "  * personal mail from a friend, family member, or individual person\n"
+        "  * transactional: receipts, invoices, payment or order confirmations, "
+        "shipping notices, event/match registrations\n"
+        "  * service providers Jason uses: vet/animal hospital, doctor, dentist, "
+        "appointment reminders, account or billing notices\n"
+        "  keep=false ONLY for clear advertising: promotions, product marketing, "
+        "sales pitches, cold sales, and generic content newsletters. "
+        "When unsure, keep=true.\n"
+        '- urgency: "Urgent" (needs action today), "Soon" (this week), or "FYI".\n'
+        '- action: one short suggested next step for Jason (e.g. "Reply to confirm '
+        'Thursday call"), or "" if none needed.\n\n'
+        "Reply with ONLY this JSON, one entry per email, covering every id from 1 to "
+        f"{len(candidates)}:\n"
+        '{"emails": [{"id": 1, "keep": true, "urgency": "Soon", "action": "..."}]}\n\n'
+        f"Emails:\n{listing}\n"
     )
-    try:
-        text = ollama_generate(prompt)
-        first = (text.split() or [""])[0].upper().strip(".,:;\"'`")
-        if first == "KEEP":
-            return True
-        if first == "DROP":
-            return False
-        # Model returned something else — fall through to urgency default
-        print(f"  Ollama unclear reply ({text[:60]!r}) → urgency default")
-    except Exception as e:
-        print(f"  Ollama email classify failed: {e}")
 
-    return urgency in ("Urgent", "Soon")
+    try:
+        text = ollama_generate(prompt, json_format=True, temperature=0.0, num_predict=2048)
+        data = json.loads(text)
+        rows = data.get("emails") if isinstance(data, dict) else data
+        by_id: dict[int, dict[str, Any]] = {}
+        for row in rows or []:
+            if isinstance(row, dict) and isinstance(row.get("id"), int):
+                by_id[row["id"]] = row
+        if not by_id:
+            raise ValueError(f"no usable entries in reply: {text[:120]!r}")
+    except Exception as e:
+        print(f"  Ollama batch classify failed ({e}) → urgency fallback")
+        return [fallback(c) for c in candidates]
+
+    verdicts: list[dict[str, Any]] = []
+    for i, cand in enumerate(candidates):
+        row = by_id.get(i + 1)
+        if row is None:
+            verdicts.append(fallback(cand))
+            continue
+        urgency = row.get("urgency")
+        if urgency not in URGENCY_RANK:
+            urgency = cand["fallbackUrgency"]
+        action = row.get("action")
+        if not isinstance(action, str):
+            action = ""
+        verdicts.append({"keep": bool(row.get("keep")), "urgency": urgency, "action": action.strip()[:140]})
+    return verdicts
 
 
 def get_unread_emails(
@@ -380,11 +419,11 @@ def get_unread_emails(
         .execute()
     )
     messages = listed.get("messages", []) or []
-    emails: list[dict[str, Any]] = []
 
     urgent_re = re.compile(r"\b(urgent|asap|immediately|eod today|action required)\b", re.I)
     soon_re = re.compile(r"\b(please reply|response needed|follow[\s-]?up|deadline|rsvp)\b", re.I)
 
+    candidates: list[dict[str, Any]] = []
     for msg_ref in messages:
         full = (
             service.users()
@@ -403,21 +442,36 @@ def get_unread_emails(
             print(f"Dropped promo: {display} — {subject[:60]}")
             continue
 
+        # Regex urgency is only the fallback; Ollama assigns the real one.
         blob = f"{subject} {snippet}"
         if urgent_re.search(blob):
-            urgency = "Urgent"
+            fallback_urgency = "Urgent"
         elif soon_re.search(blob):
-            urgency = "Soon"
+            fallback_urgency = "Soon"
         else:
-            urgency = "FYI"
+            fallback_urgency = "FYI"
 
-        print(f"Classifying email: {display} — {subject[:50]}…")
-        if not classify_email_keep(display, addr, subject, snippet, urgency):
-            print(f"  → DROP")
+        candidates.append({
+            "from": display,
+            "addr": addr,
+            "subject": subject,
+            "snippet": snippet,
+            "fallbackUrgency": fallback_urgency,
+        })
+
+    print(f"Classifying {len(candidates)} emails in one Ollama call…")
+    verdicts = classify_emails_batch(candidates)
+
+    emails: list[dict[str, Any]] = []
+    for cand, v in zip(candidates, verdicts):
+        if not v["keep"]:
+            print(f"  DROP: {cand['from']} — {cand['subject'][:60]}")
             continue
-        print(f"  → KEEP ({urgency})")
-
-        emails.append({"urgency": urgency, "from": display, "subject": subject})
+        print(f"  KEEP ({v['urgency']}): {cand['from']} — {cand['subject'][:50]}")
+        entry: dict[str, Any] = {"urgency": v["urgency"], "from": cand["from"], "subject": cand["subject"]}
+        if v.get("action"):
+            entry["action"] = v["action"]
+        emails.append(entry)
 
     emails.sort(key=lambda e: URGENCY_RANK.get(e["urgency"], 9))
     if len(emails) > keep_max:
@@ -549,7 +603,7 @@ def get_job_tracker() -> list[dict[str, Any]]:
     for page in pages:
         props = page["properties"]
         status = prop_status(props, "Status") or prop_select(props, "Status")
-        if status == "Rejected":
+        if status in {"Rejected", "Gone Cold"}:
             continue
         company = prop_title(props, ["Company", "Name", "Title"])
         if not company:
@@ -599,12 +653,23 @@ def get_job_tracker() -> list[dict[str, Any]]:
 
 
 # ── LLM (narrow calls only) ─────────────────────────────────────────────────
-def ollama_generate(prompt: str) -> str:
-    resp = requests.post(
-        OLLAMA_URL,
-        json={"model": MODEL, "prompt": prompt, "stream": False},
-        timeout=180,
-    )
+def ollama_generate(
+    prompt: str,
+    *,
+    json_format: bool = False,
+    temperature: float = 0.2,
+    num_predict: int = 400,
+) -> str:
+    body: dict[str, Any] = {
+        "model": MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,  # keep model warm across calls
+        "options": {"temperature": temperature, "num_predict": num_predict},
+    }
+    if json_format:
+        body["format"] = "json"
+    resp = requests.post(OLLAMA_URL, json=body, timeout=180)
     resp.raise_for_status()
     text = (resp.json().get("response") or "").strip()
     # Strip common wrapper noise
@@ -612,54 +677,106 @@ def ollama_generate(prompt: str) -> str:
     return text
 
 
+def deterministic_most_important(payload: dict[str, Any]) -> tuple[str, str]:
+    """
+    Python decides WHAT is most important (priority order below);
+    the LLM only writes the sentence. Returns (pick_label, canned_sentence).
+    Order: HIGH task > active job stage > interview/screen on calendar >
+           overdue task > urgent email > first calendar event.
+    """
+    tasks = (payload.get("tasks") or {}).get("dueTodayOrOverdue", [])
+    high = [t for t in tasks if t.get("highPriority")]
+    if high:
+        t = high[0]
+        due = f" (due {t['due']})" if t.get("due") else ""
+        return (f"HIGH-priority task: {t['name']}{due}",
+                f"Focus on '{t['name']}' — it's high-priority and due{due or ''}.")
+
+    active = [j for j in payload.get("jobTracker", []) if j.get("stage") in ("Interview", "Phone Screen", "Offer")]
+    if active:
+        j = active[0]
+        return (f"Job: {j['company']} at {j['stage']} stage — {j.get('nextAction', '')}",
+                f"Prioritize {j['company']} — you're at the {j['stage']} stage and momentum matters.")
+
+    screens = [ev for ev in payload.get("schedule", [])
+               if any(k in ev.get("title", "").lower() for k in ("interview", "screen"))]
+    if screens:
+        ev = screens[0]
+        return (f"Calendar: {ev['title']} at {ev.get('time', '')}",
+                f"Prepare for '{ev['title']}' at {ev.get('time', '')} — highest-stakes item on today's calendar.")
+
+    if tasks:
+        t = tasks[0]
+        return (f"Overdue/due task: {t['name']}",
+                f"Clear '{t['name']}' — it's due or overdue.")
+
+    urgent = [e for e in payload.get("emails", []) if e.get("urgency") == "Urgent"]
+    if urgent:
+        e = urgent[0]
+        return (f"Urgent email: {e['subject']} from {e['from']}",
+                f"Answer '{e['subject']}' from {e['from']} — it's urgent.")
+
+    if payload.get("schedule"):
+        ev = payload["schedule"][0]
+        return (f"Calendar: {ev['title']}",
+                f"Protect time for '{ev['title']}' — it's on today's calendar.")
+
+    return ("", "Review today's open loops and choose one forward move.")
+
+
 def pick_most_important(payload: dict[str, Any]) -> str:
+    pick, canned = deterministic_most_important(payload)
+    if not pick:
+        return canned
+
     summary = {
         "schedule": payload.get("schedule", []),
         "tasksDue": (payload.get("tasks") or {}).get("dueTodayOrOverdue", []),
-        "networking": payload.get("networking", []),
         "jobs": payload.get("jobTracker", []),
-        "urgentEmails": [e for e in payload.get("emails", []) if e.get("urgency") in ("Urgent", "Soon")],
     }
     prompt = (
-        "You help Jason plan his day. Given this JSON of today's commitments, "
-        "reply with ONE sentence naming the single most important thing to do today and why. "
-        "No preamble, no bullets, no quotes.\n\n"
+        f"Jason's single most important item today is: {pick}\n"
+        "Using the context JSON below, write ONE sentence telling Jason to do this and "
+        "why it matters today. Do NOT pick a different item. No preamble, no quotes.\n\n"
         f"{json.dumps(summary, ensure_ascii=False)}"
     )
     try:
-        return ollama_generate(prompt)
+        text = ollama_generate(prompt, temperature=0.3, num_predict=90).strip()
+        text = text.splitlines()[0].strip() if text else ""
+        if 20 <= len(text) <= 400:
+            return text
+        print(f"LLM mostImportant reply unusable ({text[:60]!r}) → canned sentence")
     except Exception as e:
         print(f"LLM mostImportant failed: {e}")
-        # Deterministic fallback
-        tasks = summary["tasksDue"]
-        high = [t for t in tasks if t.get("highPriority")]
-        if high:
-            return f"Focus on '{high[0]['name']}' — high-priority and due."
-        if summary["schedule"]:
-            return f"Protect time for '{summary['schedule'][0]['title']}' — it's on today's calendar."
-        if tasks:
-            return f"Clear '{tasks[0]['name']}' — it's due or overdue."
-        return "Review today's open loops and choose one forward move."
+    return canned
 
 
 def optional_prep_notes(payload: dict[str, Any]) -> list[str]:
+    """Candidates carry real context (time, attendees, Notion notes/project), not just titles."""
     candidates = []
     for ev in payload.get("schedule", [])[:6]:
         title = ev.get("title", "")
         if any(k in title.lower() for k in ("interview", "meeting", "call", "screen", "coffee")):
-            candidates.append(f"calendar:{title}")
+            ctx = f" at {ev['time']}" if ev.get("time") else ""
+            if ev.get("attendees"):
+                ctx += f", with {', '.join(ev['attendees'][:4])}"
+            candidates.append(f"calendar: {title}{ctx}")
     for t in (payload.get("tasks") or {}).get("dueTodayOrOverdue", [])[:6]:
         if t.get("highPriority"):
-            candidates.append(f"task:{t['name']}")
+            bits = [b for b in [f"due {t['due']}" if t.get("due") else "", t.get("project", "")] if b]
+            ctx = f" ({', '.join(bits)})" if bits else ""
+            candidates.append(f"task: {t['name']}{ctx}")
     for j in payload.get("jobTracker", [])[:4]:
         if j.get("stage") in ("Interview", "Phone Screen"):
-            candidates.append(f"job:{j['company']} ({j['stage']})")
+            ctx = f" — notes: {j['nextAction']}" if j.get("nextAction") else ""
+            candidates.append(f"job: {j['company']} ({j['stage']}){ctx}")
 
     if not candidates:
         return []
 
     prompt = (
-        "For each item that clearly needs brief prep, write one short sentence prep note. "
+        "For each item that clearly needs brief prep, write one short, specific prep note "
+        "using the context given (time, attendees, notes). "
         "Skip items that don't need prep. Return plain lines as 'label: note'. "
         "Max 4 lines. No intro.\n\nItems:\n" + "\n".join(f"- {c}" for c in candidates)
     )
@@ -680,6 +797,32 @@ def optional_prep_notes(payload: dict[str, Any]) -> list[str]:
     return notes
 
 
+def write_narrative(brief: dict[str, Any]) -> str:
+    """3–5 sentence 'shape of your day' paragraph generated from the final JSON."""
+    summary = {
+        k: brief.get(k)
+        for k in ("mostImportant", "schedule", "emails", "tasks", "networking", "jobTracker")
+        if brief.get(k)
+    }
+    prompt = (
+        f"Write Jason's morning brief narrative for {brief['dayOfWeek']}.\n"
+        "3-5 sentences, warm but direct, second person ('You have...'). "
+        "Cover the shape of the day: meetings and their times, the most important item, "
+        "notable deadlines, and anything in email or the job search that needs attention. "
+        "Plain prose only — no bullets, no headers, no preamble, no markdown.\n\n"
+        f"{json.dumps(summary, ensure_ascii=False)}"
+    )
+    try:
+        text = ollama_generate(prompt, temperature=0.5, num_predict=300).strip()
+        text = re.sub(r"\s+", " ", text)
+        if len(text) >= 40:
+            return text
+        print(f"LLM narrative too short ({text[:60]!r}) → skipping")
+    except Exception as e:
+        print(f"LLM narrative failed: {e}")
+    return ""
+
+
 def build_action_items(payload: dict[str, Any], prep_notes: list[str]) -> list[str]:
     items: list[str] = []
     for t in (payload.get("tasks") or {}).get("dueTodayOrOverdue", []):
@@ -691,7 +834,10 @@ def build_action_items(payload: dict[str, Any], prep_notes: list[str]) -> list[s
         items.append(f"Job: {j['company']} ({j['stage']}) — {j['nextAction']}")
     for e in payload.get("emails", []):
         if e.get("urgency") == "Urgent":
-            items.append(f"Email: {e['subject']} ({e['from']})")
+            if e.get("action"):
+                items.append(f"Email: {e['subject']} — {e['action']}")
+            else:
+                items.append(f"Email: {e['subject']} ({e['from']})")
     items.extend(prep_notes)
     # de-dupe preserving order
     seen: set[str] = set()
@@ -754,6 +900,11 @@ def main() -> None:
     actions = build_action_items(brief, prep)
     if actions:
         brief["actionItems"] = actions
+
+    print("Asking Ollama for morning narrative…")
+    narrative = write_narrative(brief)
+    if narrative:
+        brief["narrative"] = narrative
 
     atomic_write_json(OUTPUT_PATH, brief)
     print(f"Wrote {OUTPUT_PATH}")

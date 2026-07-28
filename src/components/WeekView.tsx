@@ -1,6 +1,7 @@
 'use client'
-import { CalEvent, Category, DAY_START, DAY_END, ROW_HEIGHT, CATEGORY_META } from '@/lib/types'
+import { CalEvent, Category, DAY_START, DAY_END, CATEGORY_META } from '@/lib/types'
 import { today, isoWeekday, formatHour, eventOccursOn, layoutEvents } from '@/lib/utils'
+import { useDayGrid } from '@/lib/useDayGrid'
 
 const HOURS = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i)
 const WEEK_DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -49,12 +50,13 @@ interface TimedBlockProps {
   date: string
   col: number
   cols: number
+  rowH: number
   onClick: (ev: CalEvent, date: string) => void
 }
 
-function TimedBlock({ ev, date, col, cols, onClick }: TimedBlockProps) {
-  const top = (ev.start - DAY_START) * ROW_HEIGHT
-  const height = Math.max((ev.end - ev.start) * ROW_HEIGHT, 18)
+function TimedBlock({ ev, date, col, cols, rowH, onClick }: TimedBlockProps) {
+  const top = (ev.start - DAY_START) * rowH
+  const height = Math.max((ev.end - ev.start) * rowH, 18)
   const left = `${(col / cols) * 100}%`
   const width = `${(1 / cols) * 100}%`
   const icon = CATEGORY_META[ev.category].icon
@@ -105,6 +107,7 @@ interface Props {
 
 export default function WeekView({ days, events, onDayClick, onCellClick, onAllDayCellClick, onEventClick }: Props) {
   const t = today()
+  const { ref: gridRef, rowH } = useDayGrid(30)
   const allEvList = Object.values(events)
 
   const allDayFor = (d: string) =>
@@ -180,11 +183,11 @@ export default function WeekView({ days, events, onDayClick, onCellClick, onAllD
       </div>
 
       {/* Time grid */}
-      <div style={{ display: 'flex', overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
+      <div ref={gridRef} style={{ display: 'flex', overflowY: 'auto', height: 'calc(100vh - 280px)' }}>
         {/* Time gutter */}
         <div style={{ width: 60, flexShrink: 0, borderRight: '1px solid var(--line)', position: 'relative' }}>
           {HOURS.map(h => (
-            <div key={h} style={{ height: ROW_HEIGHT, position: 'relative' }}>
+            <div key={h} style={{ height: rowH, position: 'relative' }}>
               <span style={{ position: 'absolute', top: -7, right: 8, fontSize: 11, color: 'var(--sub)', whiteSpace: 'nowrap' }}>
                 {formatHour(h)}
               </span>
@@ -208,12 +211,12 @@ export default function WeekView({ days, events, onDayClick, onCellClick, onAllD
                 <div
                   key={h}
                   onClick={() => onCellClick(d, h)}
-                  style={{ height: ROW_HEIGHT, borderBottom: '1px solid var(--line-soft)', cursor: 'pointer' }}
+                  style={{ height: rowH, borderBottom: '1px solid var(--line-soft)', cursor: 'pointer' }}
                 />
               ))}
               {/* Timed events */}
               {laid.map(({ ev, col, cols }) => (
-                <TimedBlock key={ev.id + d + di} ev={ev} date={d} col={col} cols={cols} onClick={onEventClick} />
+                <TimedBlock key={ev.id + d + di} ev={ev} date={d} col={col} cols={cols} rowH={rowH} onClick={onEventClick} />
               ))}
             </div>
           )

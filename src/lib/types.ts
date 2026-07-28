@@ -55,6 +55,13 @@ export const DAY_START = 6
 export const DAY_END = 22
 export const ROW_HEIGHT = 44
 
+/* Visible window of the time grid.  The grid still holds DAY_START..DAY_END,
+   so nothing is hidden, but only VIEW_HOURS are on screen at once and the
+   grid opens scrolled to VIEW_START.  Fewer visible hours means taller rows,
+   which is the zoom. */
+export const VIEW_START = 7   // 7 AM
+export const VIEW_HOURS = 12  // through 7 PM
+
 /* ── Daily Brief (from data/daily-brief.json) ─────────────── */
 export type EmailUrgency = 'Urgent' | 'Soon' | 'FYI'
 
@@ -68,6 +75,7 @@ export interface BriefEmail {
   urgency: EmailUrgency
   from: string
   subject: string
+  action?: string
 }
 
 export interface BriefTask {
@@ -94,6 +102,7 @@ export interface BriefJobItem {
 export interface DailyBrief {
   date: string
   dayOfWeek: string
+  narrative?: string
   mostImportant?: string
   schedule?: BriefScheduleItem[]
   emails?: BriefEmail[]

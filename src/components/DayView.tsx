@@ -1,9 +1,9 @@
 'use client'
-import { CalEvent, Category, DAY_START, DAY_END, ROW_HEIGHT, CATEGORY_META } from '@/lib/types'
+import { CalEvent, Category, DAY_START, DAY_END, CATEGORY_META } from '@/lib/types'
 import { today, formatHour, formatDayHeader, eventOccursOn, layoutEvents } from '@/lib/utils'
+import { useDayGrid } from '@/lib/useDayGrid'
 
 const HOURS = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i)
-const ROW_H = Math.round(ROW_HEIGHT * 1.35)
 
 function catStyle(cat: Category, prop: 'bg' | 'fg' | 'bar') {
   return `var(--cat-${cat}-${prop})`
@@ -19,6 +19,7 @@ interface Props {
 
 export default function DayView({ day, events, onCellClick, onAllDayCellClick, onEventClick }: Props) {
   const t = today()
+  const { ref: gridRef, rowH: ROW_H } = useDayGrid(34)
   const allEvList = Object.values(events)
   const allDayEvs = allEvList.filter(ev => ev.allDay && eventOccursOn(ev, day))
   const timedEvs = allEvList.filter(ev => !ev.allDay && eventOccursOn(ev, day))
@@ -65,7 +66,7 @@ export default function DayView({ day, events, onCellClick, onAllDayCellClick, o
       </div>
 
       {/* Time grid */}
-      <div style={{ display: 'flex', overflowY: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
+      <div ref={gridRef} style={{ display: 'flex', overflowY: 'auto', height: 'calc(100vh - 260px)' }}>
         {/* Gutter */}
         <div style={{ width: 60, flexShrink: 0, borderRight: '1px solid var(--line)', position: 'relative' }}>
           {HOURS.map(h => (

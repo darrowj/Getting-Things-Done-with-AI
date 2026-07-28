@@ -161,6 +161,14 @@ export default function DailyBriefPanel() {
 function BriefBody({ brief }: { brief: DailyBrief }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {brief.narrative && (
+        <Section title="Your day">
+          <Row>
+            <span style={{ fontStyle: 'italic', lineHeight: 1.55 }}>{brief.narrative}</span>
+          </Row>
+        </Section>
+      )}
+
       {brief.mostImportant && (
         <Section title="Most important">
           <Row>
@@ -200,6 +208,9 @@ function BriefBody({ brief }: { brief: DailyBrief }) {
                 </span>
                 <span style={{ fontWeight: 600 }}>{em.subject}</span>
                 <div style={{ marginTop: 3, fontSize: 12, color: 'var(--sub)' }}>{em.from}</div>
+                {em.action && (
+                  <div style={{ marginTop: 3, fontSize: 12 }}>→ {em.action}</div>
+                )}
               </Row>
             ))}
           </div>
