@@ -36,7 +36,7 @@ calendar or mail leaving the network.
 | Weekly planner UI (calendar, routine, goals) | **Live** on LAN via PM2 |
 | Daily Brief card in the planner | **Live** |
 | Brief generator (`data/daily_brief.py`) | **Live** — Calendar, Gmail, Notion + `llama3.1:8b` |
-| Weekday cron (7:00 AM Eastern) | **Installed** on Linux |
+| Weekday cron (6:00 AM Eastern) | **Installed** on Linux |
 | Filter polish (jobs) | Next — tracked in [`DAILY_BRIEF.md`](DAILY_BRIEF.md) |
 | Networking filter (Intent + ±7 follow-up) | **Done** — in `data/daily_brief.py` + brief UI |
 | Email noise filter (rules + Ollama) | **Done** — in `data/daily_brief.py` |
@@ -221,10 +221,10 @@ cp .env.example .env          # fill NOTION_TOKEN + Google credential paths
 .venv-brief/bin/python data/daily_brief.py
 ```
 
-Crontab (weekdays 7:00 AM Eastern — currently installed on the Linux box):
+Crontab (weekdays 6:00 AM Eastern — currently installed on the Linux box):
 
 ```cron
-0 7 * * 1-5 cd /home/darrowj/development/gtd-app && /home/darrowj/development/gtd-app/.venv-brief/bin/python data/daily_brief.py >> /home/darrowj/development/gtd-app/data/daily-brief.log 2>&1
+0 6 * * 1-5 cd /home/darrowj/development/gtd-app && /home/darrowj/development/gtd-app/.venv-brief/bin/python data/daily_brief.py >> /home/darrowj/development/gtd-app/data/daily-brief.log 2>&1
 ```
 
 See [`DAILY_BRIEF.md`](DAILY_BRIEF.md) for troubleshooting and planned filter improvements.

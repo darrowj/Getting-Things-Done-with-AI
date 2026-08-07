@@ -7,10 +7,10 @@ writes data/daily-brief.json.
 Unread email filtering (hybrid): hard-drop obvious promo, then Ollama KEEP
 for actionable / job-search / personal (friends-family); DROP marketing.
 
-Cron example (weekdays 7:00 AM Eastern — set on the Linux box, do not install
+Cron example (weekdays 6:00 AM Eastern — set on the Linux box, do not install
 from this script):
 
-  0 7 * * 1-5 cd /home/darrowj/development/gtd-app && /home/darrowj/development/gtd-app/.venv-brief/bin/python data/daily_brief.py >> data/daily-brief.log 2>&1
+  0 6 * * 1-5 cd /home/darrowj/development/gtd-app && /home/darrowj/development/gtd-app/.venv-brief/bin/python data/daily_brief.py >> data/daily-brief.log 2>&1
 """
 
 from __future__ import annotations
