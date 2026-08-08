@@ -40,6 +40,7 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
 MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:12b")
 OLLAMA_KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE", "30m")
 OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "600"))  # seconds per call; batch job, slow is fine
+OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "8192"))  # context window; default 4096 truncates big prompts
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_TASKS_DB = os.environ.get("NOTION_TASKS_DB", "305fc6af-d784-498f-a157-67311c0fb2b8")
@@ -666,13 +667,18 @@ def ollama_generate(
         "prompt": prompt,
         "stream": False,
         "keep_alive": OLLAMA_KEEP_ALIVE,  # keep model warm across calls
-        "options": {"temperature": temperature, "num_predict": num_predict},
+        "options": {"temperature": temperature, "num_predict": num_predict, "num_ctx": OLLAMA_NUM_CTX},
     }
     if json_format:
         body["format"] = "json"
     resp = requests.post(OLLAMA_URL, json=body, timeout=OLLAMA_TIMEOUT)
     resp.raise_for_status()
-    text = (resp.json().get("response") or "").strip()
+    data = resp.json()
+    text = (data.get("response") or "").strip()
+    if len(text) < 20 and not json_format:
+        print(f"  [ollama debug] short reply {text!r} | done_reason={data.get('done_reason')} "
+              f"prompt_tokens={data.get('prompt_eval_count')} out_tokens={data.get('eval_count')} "
+              f"prompt_chars={len(prompt)}")
     # Strip common wrapper noise
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text).strip()
     return text
