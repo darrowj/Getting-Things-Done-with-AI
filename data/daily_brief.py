@@ -736,14 +736,20 @@ def pick_most_important(payload: dict[str, Any]) -> str:
         "jobs": payload.get("jobTracker", []),
     }
     prompt = (
+        "Context JSON:\n"
+        f"{json.dumps(summary, ensure_ascii=False)}\n\n"
         f"Jason's single most important item today is: {pick}\n"
-        "Using the context JSON below, write ONE sentence telling Jason to do this and "
-        "why it matters today. Do NOT pick a different item. No preamble, no quotes.\n\n"
-        f"{json.dumps(summary, ensure_ascii=False)}"
+        "Write ONE sentence telling Jason to do this and why it matters today. "
+        "Do NOT pick a different item. No preamble, no quotes. "
+        "Reply with the sentence itself and nothing else."
     )
     try:
         text = ollama_generate(prompt, temperature=0.3, num_predict=90).strip()
-        text = text.splitlines()[0].strip() if text else ""
+        # First substantive line; skip acknowledgment/preamble lines like "Okay, here's..."
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        lines = [l for l in lines
+                 if not re.match(r"^(okay|ok|sure|certainly|here)\b", l, re.I) or len(l) > 60]
+        text = lines[0] if lines else ""
         if 20 <= len(text) <= 400:
             return text
         print(f"LLM mostImportant reply unusable ({text[:60]!r}) → canned sentence")
@@ -806,15 +812,19 @@ def write_narrative(brief: dict[str, Any]) -> str:
         if brief.get(k)
     }
     prompt = (
-        f"Write Jason's morning brief narrative for {brief['dayOfWeek']}.\n"
+        "Context JSON:\n"
+        f"{json.dumps(summary, ensure_ascii=False)}\n\n"
+        f"Write Jason's morning brief narrative for {brief['dayOfWeek']}. "
         "3-5 sentences, warm but direct, second person ('You have...'). "
         "Cover the shape of the day: meetings and their times, the most important item, "
         "notable deadlines, and anything in email or the job search that needs attention. "
-        "Plain prose only — no bullets, no headers, no preamble, no markdown.\n\n"
-        f"{json.dumps(summary, ensure_ascii=False)}"
+        "Plain prose only — no bullets, no headers, no markdown. "
+        "Do not acknowledge these instructions. Start directly with the narrative."
     )
     try:
         text = ollama_generate(prompt, temperature=0.5, num_predict=300).strip()
+        # Drop a leading acknowledgment line like "Okay, here's the narrative:"
+        text = re.sub(r"^(okay|ok|sure|certainly|here)[^\n]{0,50}:\s*\n", "", text, flags=re.I)
         text = re.sub(r"\s+", " ", text)
         if len(text) >= 40:
             return text
