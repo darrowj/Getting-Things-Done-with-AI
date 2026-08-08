@@ -655,6 +655,19 @@ def get_job_tracker() -> list[dict[str, Any]]:
 
 
 # ── LLM (narrow calls only) ─────────────────────────────────────────────────
+def compact_for_prompt(obj: Any, max_items: int = 8, max_chars: int = 140) -> Any:
+    """Shrink a context payload before it goes into a prompt: cap list lengths,
+    clip long strings.  A 4-sentence narrative does not need 24 full job records —
+    an oversized prompt fills num_ctx and leaves no room for the reply."""
+    if isinstance(obj, dict):
+        return {k: compact_for_prompt(v, max_items, max_chars) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [compact_for_prompt(v, max_items, max_chars) for v in obj[:max_items]]
+    if isinstance(obj, str) and len(obj) > max_chars:
+        return obj[: max_chars - 1] + "…"
+    return obj
+
+
 def ollama_generate(
     prompt: str,
     *,
@@ -736,11 +749,11 @@ def pick_most_important(payload: dict[str, Any]) -> str:
     if not pick:
         return canned
 
-    summary = {
+    summary = compact_for_prompt({
         "schedule": payload.get("schedule", []),
         "tasksDue": (payload.get("tasks") or {}).get("dueTodayOrOverdue", []),
         "jobs": payload.get("jobTracker", []),
-    }
+    })
     prompt = (
         "Context JSON:\n"
         f"{json.dumps(summary, ensure_ascii=False)}\n\n"
@@ -812,11 +825,11 @@ def optional_prep_notes(payload: dict[str, Any]) -> list[str]:
 
 def write_narrative(brief: dict[str, Any]) -> str:
     """3–5 sentence 'shape of your day' paragraph generated from the final JSON."""
-    summary = {
+    summary = compact_for_prompt({
         k: brief.get(k)
         for k in ("mostImportant", "schedule", "emails", "tasks", "networking", "jobTracker")
         if brief.get(k)
-    }
+    })
     prompt = (
         "Context JSON:\n"
         f"{json.dumps(summary, ensure_ascii=False)}\n\n"
