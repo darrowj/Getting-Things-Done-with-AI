@@ -39,6 +39,7 @@ TZ = ZoneInfo(os.environ.get("TZ", "America/New_York"))
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
 MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:12b")
 OLLAMA_KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE", "30m")
+OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "600"))  # seconds per call; batch job, slow is fine
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_TASKS_DB = os.environ.get("NOTION_TASKS_DB", "305fc6af-d784-498f-a157-67311c0fb2b8")
@@ -669,7 +670,7 @@ def ollama_generate(
     }
     if json_format:
         body["format"] = "json"
-    resp = requests.post(OLLAMA_URL, json=body, timeout=180)
+    resp = requests.post(OLLAMA_URL, json=body, timeout=OLLAMA_TIMEOUT)
     resp.raise_for_status()
     text = (resp.json().get("response") or "").strip()
     # Strip common wrapper noise
