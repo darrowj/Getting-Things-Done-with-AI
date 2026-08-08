@@ -37,7 +37,7 @@ load_dotenv()  # also allow cwd / process env (Linux box)
 
 TZ = ZoneInfo(os.environ.get("TZ", "America/New_York"))
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
-MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:12b")
 OLLAMA_KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE", "30m")
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")

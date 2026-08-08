@@ -146,7 +146,7 @@ box(CX, 702, CW, 38, HUMAN, "ME · read it with the first coffee")
 # ---------------------------------------------------------------- footer band
 label(LX, 786, "ALL OF THE ABOVE RUNS ON ONE LINUX BOX IN MY HOME OFFICE")
 
-box(30, 800, 326, 54, AI, "Ollama · llama3.1:8b",
+box(30, 800, 326, 54, AI, "Ollama · gemma3:12b",
     "four narrow calls, my hardware, no API")
 box(372, 800, 326, 54, SOURCE, "Ubuntu · PM2 · cron",
     "restarts on reboot, no babysitting")

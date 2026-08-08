@@ -73,7 +73,7 @@
 <text x="520.0" y="726.0" text-anchor="middle" fill="#fff" font-size="13.5" font-weight="600">ME · read it with the first coffee</text>
 <text x="30" y="786" fill="#7c848d" font-size="10.5" font-weight="700" letter-spacing="1.5">ALL OF THE ABOVE RUNS ON ONE LINUX BOX IN MY HOME OFFICE</text>
 <rect x="30" y="800" width="326" height="54" rx="8" fill="#7a2318" stroke="#a3392a" stroke-width="1.5"/>
-<text x="193.0" y="823.0" text-anchor="middle" fill="#fff" font-size="13.5" font-weight="600">Ollama · llama3.1:8b</text>
+<text x="193.0" y="823.0" text-anchor="middle" fill="#fff" font-size="13.5" font-weight="600">Ollama · gemma3:12b</text>
 <text x="193.0" y="840.0" text-anchor="middle" fill="#e3e3e3" font-size="11">four narrow calls, my hardware, no API</text>
 <rect x="372" y="800" width="326" height="54" rx="8" fill="#4a4a4a" stroke="#6b6b6b" stroke-width="1.5"/>
 <text x="535.0" y="823.0" text-anchor="middle" fill="#fff" font-size="13.5" font-weight="600">Ubuntu · PM2 · cron</text>

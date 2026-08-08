@@ -17,7 +17,7 @@ End-to-end pipeline is live on the Linux box.
 | Notion Tasks | DB `0ca7aa07fab04c9487daf530f0f4185d` (same as my-ai-agents) | Working |
 | Notion Network | DB `7fa4230a-ccc1-4213-83e8-42dc2b4aae04` | Working |
 | Notion Job Tracker | DB `f23d0d93-5b8d-440f-af9b-d399722d9f4e` | Working |
-| Ollama | `llama3.1:8b` on Linux | Working |
+| Ollama | `gemma3:12b` on Linux | Working |
 | Cron | Weekdays 6:00 AM Eastern | **Installed** |
 
 ### Machine roles
@@ -78,7 +78,7 @@ Priority ideas from first real run (2026-07-18):
 
 1. **Networking** — **Done.** Uses **Intent** (Status removed). Skips Intent = Dead End. Only includes contacts with Follow-up Date within today ± 7 days. Emits/shows `followUpDate` in the brief card.
 2. **Job Tracker** — many `Applied` / `Interested` rows. Prefer follow-up due, Phone Screen, Interview, Offer; stale Applied only.
-3. **Emails** — **Done (hybrid filter + Primary only).** Fetches `is:unread in:inbox category:primary` (Gmail Primary tab — skips Promotions/Social/Updates). Then hard-drops obvious promo and asks Ollama (`llama3.1:8b`) KEEP vs DROP. KEEP = actionable, job-search, or personal (friends/family). Caps at 25, Urgent → Soon → FYI. Tune via `PROMO_*` regexes and the classify prompt in `data/daily_brief.py`. Consumer domains (`@gmail.com`, etc.) are not hard-dropped.
+3. **Emails** — **Done (hybrid filter + Primary only).** Fetches `is:unread in:inbox category:primary` (Gmail Primary tab — skips Promotions/Social/Updates). Then hard-drops obvious promo and asks Ollama (`gemma3:12b`) KEEP vs DROP. KEEP = actionable, job-search, or personal (friends/family). Caps at 25, Urgent → Soon → FYI. Tune via `PROMO_*` regexes and the classify prompt in `data/daily_brief.py`. Consumer domains (`@gmail.com`, etc.) are not hard-dropped.
 4. **mostImportant** — LLM picked a medium task over the `🚨HIGH` BTG item. Improve prompt or prefer high-priority overdue in Python before calling Ollama.
 5. **Action items** — currently dumps many overdue tasks. Cap length; lead with HIGH + calendar + active job screens.
 6. **Tasks “later this week”** — empty with current Notion due filter; widen when ready.

@@ -24,7 +24,7 @@ slow or down degrades the brief rather than breaking it. The inbox filter is
 deliberately biased toward recall: the hard-drop regex only catches unambiguous
 marketing, and the model is told to keep anything it is unsure about.
 
-All of it runs on one Linux box. `llama3.1:8b` via Ollama, no API bill, and no
+All of it runs on one Linux box. `gemma3:12b` via Ollama, no API bill, and no
 calendar or mail leaving the network.
 
 ---
@@ -35,7 +35,7 @@ calendar or mail leaving the network.
 |------|--------|
 | Weekly planner UI (calendar, routine, goals) | **Live** on LAN via PM2 |
 | Daily Brief card in the planner | **Live** |
-| Brief generator (`data/daily_brief.py`) | **Live** — Calendar, Gmail, Notion + `llama3.1:8b` |
+| Brief generator (`data/daily_brief.py`) | **Live** — Calendar, Gmail, Notion + `gemma3:12b` |
 | Weekday cron (6:00 AM Eastern) | **Installed** on Linux |
 | Filter polish (jobs) | Next — tracked in [`DAILY_BRIEF.md`](DAILY_BRIEF.md) |
 | Networking filter (Intent + ±7 follow-up) | **Done** — in `data/daily_brief.py` + brief UI |
@@ -82,7 +82,7 @@ Planner data persists to local SQLite. The Daily Brief is a single overwriteable
 | Styling | Tailwind CSS + CSS custom properties |
 | Database | SQLite via `better-sqlite3` |
 | ORM | Drizzle ORM |
-| Daily Brief | Python 3 + Ollama (`llama3.1:8b`) |
+| Daily Brief | Python 3 + Ollama (`gemma3:12b`) |
 | Integrations | Google Calendar & Gmail (OAuth), Notion REST API |
 | Process manager | PM2 |
 | Hosting | Local Linux server (LAN only) |
